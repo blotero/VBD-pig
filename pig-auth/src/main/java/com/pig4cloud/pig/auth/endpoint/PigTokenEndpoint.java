@@ -190,8 +190,7 @@ public class PigTokenEndpoint {
 		// 清空用户信息
 		cacheManager.getCache(CacheConstants.USER_DETAILS).evict(authorization.getPrincipalName());
 		// 清空access token
-		RedisUtils.delete(String.format("token::username::%s::%s::%s", authorization.getPrincipalName(),
-				authorization.getRegisteredClientId(), accessToken.getToken().getTokenValue()));
+		authorizationService.remove(authorization);
 		// 处理自定义退出事件，保存相关日志
 		SpringContextHolder.publishEvent(new LogoutSuccessEvent(new PreAuthenticatedAuthenticationToken(
 				authorization.getPrincipalName(), authorization.getRegisteredClientId())));
