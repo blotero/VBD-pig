@@ -1,7 +1,9 @@
 package com.pig4cloud.pig.auth.support.core;
 
 import com.pig4cloud.pig.auth.support.handler.FormAuthenticationFailureHandler;
+import com.pig4cloud.pig.auth.support.handler.PigLogoutSuccessEventHandler;
 import com.pig4cloud.pig.common.security.handler.SsoLogoutSuccessHandler;
+import org.springframework.context.ApplicationContext;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
@@ -17,6 +19,8 @@ public final class FormIdentityLoginConfigurer
 
 	@Override
 	public void init(HttpSecurity http) {
+		PigLogoutSuccessEventHandler logoutEventHandler = http.getSharedObject(ApplicationContext.class)
+			.getBean(PigLogoutSuccessEventHandler.class);
 		http.formLogin(formLogin -> {
 			formLogin.loginPage("/token/login");
 			formLogin.loginProcessingUrl("/oauth2/form");
@@ -24,6 +28,11 @@ public final class FormIdentityLoginConfigurer
 			formLogin.successHandler(new SavedRequestAwareAuthenticationSuccessHandler());
 		})
 			.logout(logout -> logout.logoutUrl("/oauth2/logout")
+				.addLogoutHandler((request, response, authentication) -> {
+					if (authentication != null) {
+						logoutEventHandler.removeTokensByUsername(authentication.getName());
+					}
+				})
 				.logoutSuccessHandler(new SsoLogoutSuccessHandler())
 				.deleteCookies("JSESSIONID")
 				.invalidateHttpSession(true)) // SSO登出成功处理

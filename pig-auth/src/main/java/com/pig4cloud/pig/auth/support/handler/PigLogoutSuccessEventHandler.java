@@ -55,14 +55,11 @@ public class PigLogoutSuccessEventHandler implements ApplicationListener<LogoutS
 	@Override
 	public void onApplicationEvent(LogoutSuccessEvent event) {
 		Authentication authentication = (Authentication) event.getSource();
-		if (authentication instanceof PreAuthenticatedAuthenticationToken) {
-			// 来自 removeToken()，token 已删，仅记日志
+		try {
 			handle(authentication);
 		}
-		else {
-			// 来自 Spring Security 标准登出，token 未删，需批量清理
-			removeTokensByUsername(authentication.getName());
-			handle(authentication);
+		catch (Exception e) {
+			log.warn("退出日志记录失败, 用户: {}", authentication.getName(), e);
 		}
 	}
 
@@ -95,7 +92,7 @@ public class PigLogoutSuccessEventHandler implements ApplicationListener<LogoutS
 	 * 格式：token::username::{username}::{clientId}::{tokenId}
 	 * @param username 用户名
 	 */
-	private void removeTokensByUsername(String username) {
+	public void removeTokensByUsername(String username) {
 		Set<String> keys = RedisUtils.keys("token::username::" + username + "*");
 		for (String keyName : keys) {
 			String[] parts = keyName.split("::");
