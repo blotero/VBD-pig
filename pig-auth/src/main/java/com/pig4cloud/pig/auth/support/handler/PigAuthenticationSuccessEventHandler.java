@@ -37,10 +37,15 @@ import org.springframework.http.server.ServletServerHttpResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AccessTokenAuthenticationToken;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -65,6 +70,8 @@ public class PigAuthenticationSuccessEventHandler implements AuthenticationSucce
 
 	private final ApplicationEventPublisher publisher;
 
+	private final OAuth2AuthorizationService authorizationService;
+
 	/**
 	 * Called when a user has been successfully authenticated.
 	 * @param request the request which caused the successful authentication
@@ -82,6 +89,10 @@ public class PigAuthenticationSuccessEventHandler implements AuthenticationSucce
 		Map<String, Object> map = accessTokenAuthentication.getAdditionalParameters();
 		if (MapUtil.isNotEmpty(map)) {
 			sendSuccessEventLog(request, accessTokenAuthentication, map);
+		}
+		else if (AuthorizationGrantType.REFRESH_TOKEN.getValue()
+			.equals(request.getParameter(OAuth2ParameterNames.GRANT_TYPE))) {
+			sendRefreshEventLog(request, accessTokenAuthentication);
 		}
 
 		// 清除账号历史锁定次数
@@ -119,6 +130,39 @@ public class PigAuthenticationSuccessEventHandler implements AuthenticationSucce
 		logVo.setCreateBy(MapUtil.getStr(map, SecurityConstants.DETAILS_USERNAME));
 
 		publisher.publishEvent(new SysLogEvent(logVo));
+	}
+
+	/**
+	 * 记录刷新令牌事件
+	 * @param request HttpServletRequest
+	 * @param accessTokenAuthentication Authentication
+	 */
+	private void sendRefreshEventLog(HttpServletRequest request,
+			OAuth2AccessTokenAuthenticationToken accessTokenAuthentication) {
+		String refreshTokenValue = request.getParameter(OAuth2ParameterNames.REFRESH_TOKEN);
+		if (StrUtil.isBlank(refreshTokenValue)) {
+			return;
+		}
+
+		String clientId = accessTokenAuthentication.getRegisteredClient().getClientId();
+		try {
+			OAuth2Authorization authorization = authorizationService.findByToken(refreshTokenValue,
+					OAuth2TokenType.REFRESH_TOKEN);
+			if (authorization == null) {
+				log.warn("刷新令牌未找到授权记录, clientId: {}", clientId);
+				return;
+			}
+
+			SysLogDTO logVo = SysLogUtils.getSysLog();
+			logVo.setTitle("刷新令牌");
+			logVo.setLogType(LogTypeEnum.NORMAL.getType());
+			logVo.setServiceId(clientId);
+			logVo.setCreateBy(authorization.getPrincipalName());
+			publisher.publishEvent(new SysLogEvent(logVo));
+		}
+		catch (Exception e) {
+			log.warn("刷新令牌日志记录失败, clientId: {}, {}", clientId, e.getMessage());
+		}
 	}
 
 	/**
