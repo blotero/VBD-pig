@@ -145,6 +145,30 @@ public class PigTokenEndpoint {
 	}
 
 	/**
+	 * 使用刷新令牌注销
+	 * @param refreshToken 刷新令牌
+	 * @return {@link R }<{@link Boolean }>
+	 */
+	@PostMapping("/token/logout/refresh")
+	public R<Boolean> logoutByRefreshToken(
+			@RequestParam(value = OAuth2ParameterNames.REFRESH_TOKEN, required = false) String refreshToken) {
+		if (StrUtil.isBlank(refreshToken)) {
+			return R.ok();
+		}
+
+		OAuth2Authorization authorization = authorizationService.findByToken(refreshToken,
+				OAuth2TokenType.REFRESH_TOKEN);
+		if (authorization == null || authorization.getRefreshToken() == null) {
+			return R.ok();
+		}
+
+		authorizationService.remove(authorization);
+		SpringContextHolder.publishEvent(new LogoutSuccessEvent(new PreAuthenticatedAuthenticationToken(
+				authorization.getPrincipalName(), authorization.getRegisteredClientId())));
+		return R.ok();
+	}
+
+	/**
 	 * 校验token
 	 * @param token 令牌
 	 * @return
