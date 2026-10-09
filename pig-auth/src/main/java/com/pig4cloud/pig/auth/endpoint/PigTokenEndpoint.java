@@ -141,7 +141,14 @@ public class PigTokenEndpoint {
 		}
 
 		String tokenValue = authHeader.replace(OAuth2AccessToken.TokenType.BEARER.getValue(), StrUtil.EMPTY).trim();
-		return removeToken(tokenValue);
+		OAuth2Authorization authorization = authorizationService.findByToken(tokenValue, OAuth2TokenType.ACCESS_TOKEN);
+		if (authorization == null) {
+			return R.ok();
+		}
+
+		SpringContextHolder.publishEvent(new LogoutSuccessEvent(new PreAuthenticatedAuthenticationToken(
+				authorization.getPrincipalName(), authorization.getRegisteredClientId())));
+		return R.ok();
 	}
 
 	/**
