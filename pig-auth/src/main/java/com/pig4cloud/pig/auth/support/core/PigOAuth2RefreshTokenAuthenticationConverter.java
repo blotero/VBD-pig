@@ -37,8 +37,10 @@ public class PigOAuth2RefreshTokenAuthenticationConverter implements Authenticat
 		Authentication clientPrincipal = SecurityContextHolder.getContext().getAuthentication();
 
 		// refresh_token (REQUIRED)
-		String refreshToken = parameters.getFirst(OAuth2ParameterNames.REFRESH_TOKEN);
-		if (!StringUtils.hasText(refreshToken) || parameters.get(OAuth2ParameterNames.REFRESH_TOKEN).size() != 1) {
+		String tokenParameter = parameters.containsKey(OAuth2ParameterNames.REFRESH_TOKEN)
+				? OAuth2ParameterNames.REFRESH_TOKEN : OAuth2ParameterNames.TOKEN;
+		String refreshToken = parameters.getFirst(tokenParameter);
+		if (!StringUtils.hasText(refreshToken) || parameters.get(tokenParameter).size() != 1) {
 			OAuth2EndpointUtils.throwError(OAuth2ErrorCodes.INVALID_REQUEST, OAuth2ParameterNames.REFRESH_TOKEN,
 					OAuth2EndpointUtils.ACCESS_TOKEN_REQUEST_ERROR_URI);
 		}
@@ -56,7 +58,7 @@ public class PigOAuth2RefreshTokenAuthenticationConverter implements Authenticat
 
 		Map<String, Object> additionalParameters = new HashMap<>();
 		parameters.forEach((key, value) -> {
-			if (!key.equals(OAuth2ParameterNames.GRANT_TYPE) && !key.equals(OAuth2ParameterNames.REFRESH_TOKEN)
+			if (!key.equals(OAuth2ParameterNames.GRANT_TYPE) && !key.equals(tokenParameter)
 					&& !key.equals(OAuth2ParameterNames.SCOPE)) {
 				additionalParameters.put(key, (value.size() == 1) ? value.get(0) : value.toArray(new String[0]));
 			}
